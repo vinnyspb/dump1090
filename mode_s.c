@@ -1144,7 +1144,7 @@ void decodeModesMessage(struct modesMessage *mm, unsigned char *msg) {
 //
 void displayModesMessage(struct modesMessage *mm) {
     char buffer[512];
-    int bytesWrote;
+    int bytesWritten;
 
     // Handle only addresses mode first.
     if (Modes.onlyaddr) {
@@ -1153,8 +1153,8 @@ void displayModesMessage(struct modesMessage *mm) {
     }
 
     // Show the raw message.
-    bytesWrote = modesOutputRawMessage(mm, buffer);
-    buffer[bytesWrote] = '\0';
+    bytesWritten = modesOutputRawMessage(mm, buffer);
+    buffer[bytesWritten] = '\0';
     printf("%s", buffer);
 
     if (Modes.raw) {

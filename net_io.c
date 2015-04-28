@@ -267,7 +267,7 @@ int modesOutputRawMessage(struct modesMessage *mm, char* buffer)
     int msgLen = mm->msgbits / 8;
     int j;
     unsigned char timeStamp[6];
-    int bytesWrote = 0;
+    int bytesWritten = 0;
     uint32_t tods, ns;
     
     struct timeb epocTime_receive;
@@ -302,7 +302,7 @@ int modesOutputRawMessage(struct modesMessage *mm, char* buffer)
             sprintf(buffer, "%02X", timeStamp[j]);
             buffer += 2;
         }
-        bytesWrote += 12; // additional 12 characters for timestamp
+        bytesWritten += 12; // additional 12 characters for timestamp
     } else
         *buffer++ = '*';
     
@@ -314,8 +314,8 @@ int modesOutputRawMessage(struct modesMessage *mm, char* buffer)
     *buffer++ = ';';
     *buffer++ = '\n';
     
-    bytesWrote += ((msgLen*2) + 3);
-    return bytesWrote;
+    bytesWritten += ((msgLen*2) + 3);
+    return bytesWritten;
 }
 //
 //=========================================================================
@@ -324,9 +324,9 @@ int modesOutputRawMessage(struct modesMessage *mm, char* buffer)
 //
 void modesSendRawOutput(struct modesMessage *mm) {
     char *p = &Modes.rawOut[Modes.rawOutUsed];
-    int bytesWrote = modesOutputRawMessage(mm, p);
+    int bytesWritten = modesOutputRawMessage(mm, p);
 
-    Modes.rawOutUsed += bytesWrote;
+    Modes.rawOutUsed += bytesWritten;
     if (Modes.rawOutUsed >= Modes.net_output_raw_size)
       {
       modesSendAllClients(Modes.ros, Modes.rawOut, Modes.rawOutUsed);
