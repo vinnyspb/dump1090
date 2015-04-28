@@ -1143,8 +1143,8 @@ void decodeModesMessage(struct modesMessage *mm, unsigned char *msg) {
 // in a human readable format.
 //
 void displayModesMessage(struct modesMessage *mm) {
-    int j;
-    unsigned char * pTimeStamp;
+    char buffer[512];
+    int bytesWrote;
 
     // Handle only addresses mode first.
     if (Modes.onlyaddr) {
@@ -1153,17 +1153,9 @@ void displayModesMessage(struct modesMessage *mm) {
     }
 
     // Show the raw message.
-    if (Modes.mlat && mm->timestampMsg) {
-        printf("@");
-        pTimeStamp = (unsigned char *) &mm->timestampMsg;
-        for (j=5; j>=0;j--) {
-            printf("%02X",pTimeStamp[j]);
-        } 
-    } else
-        printf("*");
-
-    for (j = 0; j < mm->msgbits/8; j++) printf("%02x", mm->msg[j]);
-    printf(";\n");
+    bytesWrote = modesOutputRawMessage(mm, buffer);
+    buffer[bytesWrote] = '\0';
+    printf("%s", buffer);
 
     if (Modes.raw) {
         fflush(stdout); // Provide data to the reader ASAP

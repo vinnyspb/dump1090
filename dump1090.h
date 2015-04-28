@@ -458,6 +458,8 @@ void modesReadFromClients (void);
 void modesSendAllClients  (int service, void *msg, int len);
 void modesQueueOutput     (struct modesMessage *mm);
 void modesReadFromClient(struct client *c, char *sep, int(*handler)(struct client *, char *));
+int modesFindMessageReceptionTime(struct modesMessage *mm, struct timeb* epocTime_receive);
+int modesOutputRawMessage(struct modesMessage *mm, char* buffer);
 
 #ifdef __cplusplus
 }

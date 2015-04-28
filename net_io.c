@@ -260,34 +260,73 @@ void modesSendBeastOutput(struct modesMessage *mm) {
 //
 //=========================================================================
 //
+// Outputs a hex-encoded raw message to the specified buffer
+//
+int modesOutputRawMessage(struct modesMessage *mm, char* buffer)
+{
+    int msgLen = mm->msgbits / 8;
+    int j;
+    unsigned char timeStamp[6];
+    int bytesWrote = 0;
+    uint32_t tods, ns;
+    
+    struct timeb epocTime_receive;
+    struct tm    utcTime_receive;
+    
+    if (Modes.mlat && mm->timestampMsg) {
+        // Find message reception time
+        if (modesFindMessageReceptionTime(mm, &epocTime_receive) == 0) {
+            utcTime_receive = *gmtime(&epocTime_receive.time);
+        } else {
+            ftime(&epocTime_receive); // We don't have a usable reception time; use the current system time
+            utcTime_receive = *gmtime(&epocTime_receive.time);
+        }
+        
+        tods = utcTime_receive.tm_hour*3600 + utcTime_receive.tm_min*60 + utcTime_receive.tm_sec;
+        ns = epocTime_receive.millitm * 1000000;
+        
+        // Encode message receive timestamp in Radarcape format (UTC):
+        // SecondsOfDay are using the upper 18 bits of the timestamp
+        // Nanoseconds are using the lower 30 bits
+        // http://wiki.modesbeast.com/Radarcape:Firmware_Versions#The_GPS_timestamp
+        timeStamp[0] = (tods >> 10) & 0xFF;
+        timeStamp[1] = (tods >> 2) & 0xFF;
+        timeStamp[2] = (tods << 6) & 0xC0;
+        timeStamp[2] |= (ns >> 24) & 0xFF;
+        timeStamp[3] = (ns >> 16) & 0xFF;
+        timeStamp[4] = (ns >> 8) & 0xFF;
+        timeStamp[5] = ns & 0xFF;
+        
+        *buffer++ = '@';
+        for (j = 0; j < 6; j++) {
+            sprintf(buffer, "%02X", timeStamp[j]);
+            buffer += 2;
+        }
+        bytesWrote += 12; // additional 12 characters for timestamp
+    } else
+        *buffer++ = '*';
+    
+    for (j = 0; j < msgLen; j++) {
+        sprintf(buffer, "%02X", mm->msg[j]);
+        buffer += 2;
+    }
+    
+    *buffer++ = ';';
+    *buffer++ = '\n';
+    
+    bytesWrote += ((msgLen*2) + 3);
+    return bytesWrote;
+}
+//
+//=========================================================================
+//
 // Write raw output to TCP clients
 //
 void modesSendRawOutput(struct modesMessage *mm) {
     char *p = &Modes.rawOut[Modes.rawOutUsed];
-    int  msgLen = mm->msgbits / 8;
-    int j;
-    unsigned char * pTimeStamp;
+    int bytesWrote = modesOutputRawMessage(mm, p);
 
-    if (Modes.mlat && mm->timestampMsg) {
-        *p++ = '@';
-        pTimeStamp = (unsigned char *) &mm->timestampMsg;
-        for (j = 5; j >= 0; j--) {
-            sprintf(p, "%02X", pTimeStamp[j]);
-            p += 2;
-        }
-        Modes.rawOutUsed += 12; // additional 12 characters for timestamp
-    } else
-        *p++ = '*';
-
-    for (j = 0; j < msgLen; j++) {
-        sprintf(p, "%02X", mm->msg[j]);
-        p += 2;
-    }
-
-    *p++ = ';';
-    *p++ = '\n';
-
-    Modes.rawOutUsed += ((msgLen*2) + 3);
+    Modes.rawOutUsed += bytesWrote;
     if (Modes.rawOutUsed >= Modes.net_output_raw_size)
       {
       modesSendAllClients(Modes.ros, Modes.rawOut, Modes.rawOutUsed);
@@ -298,12 +337,36 @@ void modesSendRawOutput(struct modesMessage *mm) {
 //
 //=========================================================================
 //
+// Searches for the exact message reception time saved on reception
+// Returns 0 on success filling the epocTime_receive structure with the reception time
+//
+int modesFindMessageReceptionTime(struct modesMessage *mm, struct timeb* epocTime_receive)
+{
+    uint32_t offset;
+    
+    if (mm->timestampMsg && !mm->remote) {                        // Make sure the records' timestamp is valid before using it
+        *epocTime_receive = Modes.stSystemTimeBlk;                // This is the time of the start of the Block we're processing
+        offset   = (int) (mm->timestampMsg - Modes.timestampBlk); // This is the time (in 12Mhz ticks) into the Block
+        offset   = offset / 12000;                                // convert to milliseconds
+        epocTime_receive->millitm += offset;                      // add on the offset time to the Block start time
+        if (epocTime_receive->millitm > 999) {                    // if we've caused an overflow into the next second...
+            epocTime_receive->millitm -= 1000;
+            epocTime_receive->time ++;                            //    ..correct the overflow
+        }
+        
+        return (0);
+    }
+    
+    return (-1);
+}
+//
+//=========================================================================
+//
 // Write SBS output to TCP clients
 // The message structure mm->bFlags tells us what has been updated by this message
 //
 void modesSendSBSOutput(struct modesMessage *mm) {
     char msg[256], *p = msg;
-    uint32_t     offset;
     struct timeb epocTime_receive, epocTime_now;
     struct tm    stTime_receive, stTime_now;
     int          msgType;
@@ -352,15 +415,7 @@ void modesSendSBSOutput(struct modesMessage *mm) {
     stTime_now = *localtime(&epocTime_now.time);
 
     // Find message reception time
-    if (mm->timestampMsg && !mm->remote) {                        // Make sure the records' timestamp is valid before using it
-        epocTime_receive = Modes.stSystemTimeBlk;                 // This is the time of the start of the Block we're processing
-        offset   = (int) (mm->timestampMsg - Modes.timestampBlk); // This is the time (in 12Mhz ticks) into the Block
-        offset   = offset / 12000;                                // convert to milliseconds
-        epocTime_receive.millitm += offset;                       // add on the offset time to the Block start time
-        if (epocTime_receive.millitm > 999) {                     // if we've caused an overflow into the next second...
-            epocTime_receive.millitm -= 1000;
-            epocTime_receive.time ++;                             //    ..correct the overflow
-        }
+    if (modesFindMessageReceptionTime(mm, &epocTime_receive) == 0) {
         stTime_receive = *localtime(&epocTime_receive.time);
     } else {
         epocTime_receive = epocTime_now;                          // We don't have a usable reception time; use the current system time
