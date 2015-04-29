@@ -297,12 +297,17 @@ int modesOutputRawMessage(struct modesMessage *mm, char* buffer)
         timeStamp[4] = (ns >> 8) & 0xFF;
         timeStamp[5] = ns & 0xFF;
         
-        *buffer++ = '@';
+        *buffer++ = '#';
+        
         for (j = 0; j < 6; j++) {
             sprintf(buffer, "%02X", timeStamp[j]);
             buffer += 2;
         }
-        bytesWritten += 12; // additional 12 characters for timestamp
+        
+        sprintf(buffer, "%02X", mm->signalLevel);
+        buffer += 2;
+        
+        bytesWritten += 14; // additional 12 characters for timestamp and 2 for signal level
     } else
         *buffer++ = '*';
     
