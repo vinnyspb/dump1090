@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 2.8)
 project (dump1090)
 
 find_library(PTHREAD_LIBRARY pthread)
-find_library(RTLSDR_LIBRARY rtlsdr)
+find_library(RTLSDR_LIBRARY rtlsdr PATHS /usr/lib/fr24 NO_DEFAULT_PATH)
 find_library(M_LIBRARY m)
 
 set(common_HDR
